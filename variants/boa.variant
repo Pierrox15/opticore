@@ -1,0 +1,15 @@
+GAME_LABEL="Blade of Agony 3.2"
+GAME_DIR="doom/boa3.2"
+TARGET_ENGINE="uzdoom-trunk"
+LAUNCH_PARAMS="-iwad boa.ipk3 -savedir saves +vid_preferbackend 1 +skill 2 +cl_run 1"
+
+GAME_DESC="
+# Blade of Agony 3.2
+Un FPS narratif et ultra-lourd repoussant les limites absolues du moteur ZDoom. Cette version pousse l'architecture à ses limites avec sa géométrie complexe et ses scripts massifs.
+* **Optimisations incluses** : API Vulkan forcée, difficulté stabilisée.
+* **Style** : Néo-rétro / Action WW2.
+"
+
+SOURCES=(
+    "boa-data:."
+)

@@ -1,0 +1,18 @@
+# core/variants/hl-blueshift.variant
+
+# --- Informations Générales ---
+GAME_LABEL="Half-Life Opposing Force (1999)"
+GAME_DESC="Incarnez le caporal Adrian Shephard quelques heures apres la catastrophe de Black Mesa"
+GAME_DIR="hl-opforce"
+
+# --- Moteur Cible ---
+TARGET_ENGINE="xash3d-master"
+
+# --- Sources d'Assets ---
+# Format : "dossier_source_dans_assets:nom_destination_dans_dist"
+SOURCES=(
+    "half-life/valve:valve"
+    "half-life/gearbox:gearbox"
+)
+
+LAUNCH_PARAMS="-console -game gearbox"

@@ -1,0 +1,49 @@
+#!/bin/bash
+# Script de compilation pour GZSelaco (Pancake Engine) - OptiBox-780 Edition
+
+# Configuration des chemins
+SOURCE_DIR="/opt/games/games-builds/sources/gzselaco"
+BUILD_DIR="$SOURCE_DIR/build"
+INSTALL_DIR="/opt/games/games/selaco"
+LOG_FILE="/opt/games/games-builds/build-logs/gzselaco_$(date +%F).log"
+
+echo ">>> Nettoyage et préparation du build dans $BUILD_DIR..."
+
+# On recrée un dossier build propre pour éviter les erreurs de lien (LD) précédentes
+mkdir -p "$BUILD_DIR"
+rm -rf "$BUILD_DIR"/*
+cd "$BUILD_DIR" || exit
+
+echo ">>> Configuration CMake (C++17 + GCC 14 compatibility)..."
+
+# 1. On active -fpermissive pour ignorer les erreurs de types incomplets de GCC 14
+# 2. On force le nom du binaire à 'Selaco' (sans chemin relatif complexe)
+# 3. On optimise pour l'architecture Yorkfield (Xeon X3370)
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_FLAGS="-O3 -march=native -pipe -fpermissive" \
+    -DCMAKE_C_FLAGS="-O3 -march=native -pipe" \
+    -DHAVE_VULKAN=ON \
+    -DHAVE_GLES2=ON \
+    -DZDOOM_EXE_NAME="Selaco" \
+    2>&1 | tee "$LOG_FILE"
+
+echo ">>> Compilation sur 4 cœurs..."
+make -j$(nproc) 2>&1 | tee -a "$LOG_FILE"
+
+# Vérification du binaire avant déploiement
+if [ -f "src/Selaco" ] || [ -f "Selaco" ]; then
+    echo ">>> Succès ! Déploiement vers $INSTALL_DIR..."
+    mkdir -p "$INSTALL_DIR"
+    
+    # On récupère le binaire là où il a été généré
+    find . -name "Selaco" -type f -exec cp -v {} "$INSTALL_DIR/" \;
+    
+    # On récupère les fichiers de données indispensables (.pk3)
+    find . -name "*.pk3" -type f -exec cp -v {} "$INSTALL_DIR/" \;
+    
+    echo ">>> Installation terminée. Binaire disponible dans $INSTALL_DIR/Selaco"
+else
+    echo "!!! ERREUR : Le binaire Selaco n'a pas été généré. Vérifie le log : $LOG_FILE"
+    exit 1
+fi

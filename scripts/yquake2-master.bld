@@ -1,0 +1,95 @@
+#!/bin/bash
+# core/scripts/yquake2-master.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ENGINE="yquake2"
+ENGINE_LABEL="Yamagi Quake 2"
+ENGINE_PORT="Quake 2"
+ENGINE_FEATURES="Client Quake 2 moderne, Rendu OpenGL 3.2 et Vulkan natif, optimisations multicœurs"
+
+# Sources du moteur principal
+REPO_URL="https://github.com/yquake2/yquake2.git"
+REPO_BRANCH_TAG="master"
+REPO_DEPTH=1
+
+# Sources de l'extension Vulkan
+VK_REPO_URL="https://github.com/yquake2/ref_vk.git"
+VK_BRANCH_TAG="master"
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ENGINE}"
+VK_LOCAL_SOURCE="$LOCAL_SOURCE/ref_vk"  # Le renderer DOIT être dans le dossier du moteur
+LOG_FILE="$OB_CORE_LOG/${ENGINE}_$(date +%F).log"
+ENGINE_DEST_DIR="$OB_ENGINES_DIR/${ENGINE}-${REPO_BRANCH_TAG:-master}"
+
+# Synchronisation Git yquake2 *ET* Ref_vk
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+MAIN_GIT_SHA=$OB_GIT_SHORT_SHA # On sauvegarde le SHA principal
+ob_git_sync "$VK_REPO_URL" "$VK_LOCAL_SOURCE" "$VK_BRANCH_TAG" "$REPO_DEPTH"
+VK_GIT_SHA=$OB_GIT_SHORT_SHA
+
+# On compil ou pas?
+ob_build_check "${ENGINE}" "${ENGINE_DEST_DIR}/${ENGINE}"
+
+# Métadonnées
+ENGINE_DESC="
+## Engine: ${ENGINE_LABEL} (${ENGINE_PORT})
+* **Install Dir** : ${ENGINE_DEST_DIR}
+* **Git YQuake2** : ${REPO_BRANCH_TAG} (${MAIN_GIT_SHA})
+* **Git Ref_VK** : ${VK_BRANCH_TAG} (${VK_GIT_SHA})
+* **Features** : ${ENGINE_FEATURES}
+* **Build date** : $(date +%F) by ${OB_USER}@${OB_HOST}
+* **Build on** : ${OB_CPU_DESC}
+* **Build infos** : ${OB_CFLAGS_DESC}
+* **Build flags** : ${CFLAGS}
+"
+
+#  Compilation yquake2
+ob_info "Compilation de Yamagi Quake 2..."
+cd "$LOCAL_SOURCE" || ob_error "Impossible d'accéder à $LOCAL_SOURCE"
+make clean
+# Yamagi utilise un Makefile brut (pas de cmake), les variables globales s'y injectent bien
+make -j"$OB_MAKE_JOBS" 2>&1 | tee "$LOG_FILE"
+
+# Compilation du render Vulkan :P
+ob_info "Compilation du renderer Vulkan (ref_vk)..."
+cd "$VK_LOCAL_SOURCE" || ob_error "Impossible d'accéder à $VK_LOCAL_SOURCE"
+make clean
+make -j"$OB_MAKE_JOBS" 2>&1 | tee -a "$LOG_FILE"
+
+# Installation
+if [ -f "$LOCAL_SOURCE/release/quake2" ]; then
+    ob_info "Installation des binaires dans ${ENGINE_DEST_DIR}..."
+    mkdir -p "${ENGINE_DEST_DIR}/baseq2"
+
+    # Exécutables (Client et Serveur)
+    cp "$LOCAL_SOURCE/release/quake2" "${ENGINE_DEST_DIR}/${ENGINE}"
+    cp "$LOCAL_SOURCE/release/q2ded" "${ENGINE_DEST_DIR}/" 2>/dev/null || true
+
+    # Librairies de rendu (OpenGL 1/3, Soft)
+    cp "$LOCAL_SOURCE/release/ref_"*.so "${ENGINE_DEST_DIR}/"
+
+    # Librairie du rendu Vulkan sus-compilée
+    if [ -f "$VK_LOCAL_SOURCE/release/ref_vk.so" ]; then
+        cp "$VK_LOCAL_SOURCE/release/ref_vk.so" "${ENGINE_DEST_DIR}/"
+        ob_success "Module Vulkan installé avec succès."
+    else
+        ob_warn "Module Vulkan introuvable après compilation."
+    fi
+
+    # Librairie logique du jeu (indispensable!)
+    cp "$LOCAL_SOURCE/release/baseq2/game.so" "${ENGINE_DEST_DIR}/baseq2/"
+
+    # Génération du fichier d'information
+    echo -e "$ENGINE_DESC" > "${ENGINE_DEST_DIR}/${ENGINE}.info"
+
+    # Export des variables pour le linker (si appelé via opticore.sh)
+    export ENGINE_DEST_DIR
+    export ENGINE_LABEL
+else
+    ob_error "Compilation échouée. Binaire 'quake2' introuvable."
+fi
+
+ob_success "Build ${ENGINE_LABEL} (avec Vulkan) terminé."

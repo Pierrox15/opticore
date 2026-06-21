@@ -1,0 +1,95 @@
+#!/bin/bash
+# core/scripts/openxray-master.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ENGINE="openxray"
+ENGINE_LABEL="OpenXRay"
+ENGINE_PORT="X-Ray Engine 1.6 (S.T.A.L.K.E.R.)"
+ENGINE_FEATURES="Port natif Linux 64-bit, support DirectX/OpenGL, optimisation multi-core"
+
+REPO_URL="https://github.com/OpenXRay/xray-16.git"
+REPO_BRANCH_TAG="master"
+REPO_DEPTH=1
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ENGINE}"
+LOG_FILE="$OB_CORE_LOG/${ENGINE}_$(date +%F).log"
+ENGINE_DEST_DIR="$OB_ENGINES_DIR/${ENGINE}-${REPO_BRANCH_TAG:-master}"
+
+# 1. Synchronisation Git
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+
+# --- ÉTAPE DE RÉPARATION (CRUCIAL) ---
+# On réinitialise le fichier que les anciens 'sed' ont cassé
+ob_info "Réinitialisation des fichiers de configuration LuaJIT..."
+cd "$LOCAL_SOURCE" || exit 1
+
+# 2. Vérification de la nécessité de compiler
+ob_build_check "${ENGINE}" "${ENGINE_DEST_DIR}/bin/xr_3da"
+
+# 3. Métadonnées
+ENGINE_DESC="
+## Engine: ${ENGINE_LABEL} (${ENGINE_PORT})
+* **Install Dir** : ${ENGINE_DEST_DIR}
+* **Git url** : ${REPO_URL}
+* **Git target** : ${REPO_BRANCH_TAG}
+* **Git Version** : ${OB_GIT_SHORT_SHA}
+* **Features** : ${ENGINE_FEATURES}
+* **Build date** : $(date +%F) by ${OB_USER}@${OB_HOST}
+* **Build on** : ${OB_CPU_DESC}
+* **Build flags** : ${CFLAGS}
+"
+
+# 4. Compilation
+ob_info "Configuration de l'environnement de build (CMake)..."
+rm -rf build && mkdir build && cd build || ob_error "Impossible de créer build."
+
+TMP_INSTALL_DIR="${LOCAL_SOURCE}/build/install_tmp"
+
+ob_info "Injection des variables d'architecture (Méthode Cache)..."
+
+# Note : On désactive USE_LTO car il force l'injection de flags incompatibles
+# avec la détection LuaJIT sur tes Xeon[cite: 12, 18].
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DUSE_LTO=OFF \
+    -DTESTARCH_OUTPUT="LJ_TARGET_X64" \
+    -DTARGET_LJARCH="x64" \
+    -DCMAKE_C_FLAGS="$CFLAGS -fcommon" \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS -fcommon" \
+    -DCMAKE_INSTALL_PREFIX="$TMP_INSTALL_DIR" \
+    2>&1 | tee "$LOG_FILE" [cite: 46, 47]
+
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    ob_info "Lancement de Make..."
+    make -j"$OB_MAKE_JOBS" 2>&1 | tee -a "$LOG_FILE" [cite: 48]
+    make install
+else
+    ob_warn "La méthode cache a échoué, repli sur isolation d'environnement..."
+    rm -rf * # Nettoyage du build raté
+
+    # On vide les variables pour le test LuaJIT mais on les garde pour CMake
+    env CFLAGS="" CXXFLAGS="" LDFLAGS="" cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DUSE_LTO=OFF \
+        -DCMAKE_C_FLAGS="$CFLAGS -fcommon" \
+        -DCMAKE_CXX_FLAGS="$CXXFLAGS -fcommon" \
+        -DCMAKE_INSTALL_PREFIX="$TMP_INSTALL_DIR"
+
+    make -j"$OB_MAKE_JOBS" 2>&1 | tee -a "$LOG_FILE"
+    make install
+fi
+
+# 5. Déploiement
+if [ -f "${TMP_INSTALL_DIR}/bin/xr_3da" ]; then
+    ob_info "Installation finale dans ${ENGINE_DEST_DIR}..."
+    rm -rf "${ENGINE_DEST_DIR}"
+    mkdir -p "${ENGINE_DEST_DIR}"
+    cp -r "${TMP_INSTALL_DIR}/"* "${ENGINE_DEST_DIR}/"
+    echo -e "$ENGINE_DESC" > "${ENGINE_DEST_DIR}/${ENGINE}.info"
+    ob_success "Build OpenXRay terminé."
+else
+    ob_error "Binaire introuvable après compilation."
+fi

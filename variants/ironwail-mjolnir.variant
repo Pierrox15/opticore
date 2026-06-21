@@ -1,0 +1,17 @@
+# core/variants/ironwail-mjolnir.variant
+GAME_LABEL="Quake: Mjölnir"
+GAME_DIR="quake/ironwail-mjolnir"
+
+TARGET_ENGINE="ironwail-master"
+LAUNCH_PARAMS="-game mjolnir"
+
+GAME_DESC="## Description
+Le mod Mjolnïr s'inspire du concept original de Quake : un monde médiéval où les joueurs manient le marteau de Thor. Lancé en juin 2023 pour célébrer le 27e anniversaire de Quake, ce projet — propulsé par le mod Keep — est le fruit d'un travail collaboratif entre de nombreux artistes et musiciens, avec le soutien de l'Université du Manitoba.
+* ** Moteurs **  : L'utilisation de moteurs modernes tels qu'Ironwail, vkQuake ou Quakespasm-Spiked est recommandée.
+* ** Contenu ** : Intègre des éléments issus d'Arcane Dimensions et d'Arms of Asgard."
+
+# Format : "DossierSource:DossierCible"
+SOURCES=(
+    "quake/id1:id1"
+    "quake/mjolnir:mjolnir"
+)

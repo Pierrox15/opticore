@@ -1,0 +1,21 @@
+#!/bin/bash
+# core/variants/hl-czero.variant
+
+# --- Informations Générales ---
+GAME_LABEL="Half-Life Counter Strike Condition Zero (2004)"
+GAME_DESC="sorti en 2004, est une évolution directe et \"haute définition\" du mythique CS 1.6. Conçu à l'origine pour offrir une expérience solo à la franchise Counter-Strike, le titre a connu un développement complexe, passant entre les mains de plusieurs studios (Rogue Entertainment, Gearbox, Ritual, et finalement Turtle Rock Studios)."
+GAME_DIR="hl-czero"
+
+# --- Moteur Cible ---
+# On utilise le moteur FWGS que nous venons de compiler
+TARGET_ENGINE="xash3d-master"
+
+# --- Sources d'Assets ---
+# Format : "dossier_source_dans_assets:nom_destination_dans_dist"
+SOURCES=(
+     "half-life/valve:valve"
+     "half-life/czerosteam/cstrike:cstrike"
+     "half-life/czerosteam/czero:czero"
+)
+
+LAUNCH_PARAMS="-console -game czero"

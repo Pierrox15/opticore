@@ -1,0 +1,55 @@
+#!/bin/bash
+# core/scripts/dhewm3-sdk.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+LIB_NAME="dhewm3-sdk"
+LIB_LABEL="dhewm3 SDK (Mods Plugins)"
+
+REPO_URL="https://github.com/dhewm/dhewm3-sdk.git"
+REPO_BRANCH_TAG="master"
+REPO_DEPTH=1
+
+LOCAL_SOURCE="$OB_CORE_SRC/${LIB_NAME}"
+LOG_FILE="$OB_CORE_LOG/${LIB_NAME}_$(date +%F).log"
+
+# On cible directement le dossier d'installation du moteur
+TARGET_ENGINE_DIR="$OB_ENGINES_DIR/dhewm3-master"
+
+# 1. Synchronisation Git
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+
+# 2. Vérification (on check si cdoom.so existe déjà dans le moteur)
+ob_build_check "${LIB_NAME}" "${TARGET_ENGINE_DIR}/cdoom.so"
+
+# 3. Compilation du SDK
+cd "$LOCAL_SOURCE" || ob_error "Impossible d'accéder au dossier source du SDK."
+
+ob_info "Configuration de l'environnement de build (CMake) pour les plugins..."
+rm -rf build
+mkdir build
+cd build || ob_error "Impossible de créer le dossier build."
+
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_FLAGS="$CFLAGS" \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+    -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS" \
+    2>&1 | tee "$LOG_FILE"
+
+ob_info "Lancement de Make pour les plugins..."
+make -j"$OB_MAKE_JOBS" 2>&1 | tee -a "$LOG_FILE"
+
+# 4. Installation dans le dossier du moteur
+ob_info "Copie des plugins (.so) vers ${TARGET_ENGINE_DIR}..."
+mkdir -p "${TARGET_ENGINE_DIR}"
+
+find . -type f -name "*.so" -exec cp {} "${TARGET_ENGINE_DIR}/" \;
+
+if ls "${TARGET_ENGINE_DIR}"/*.so 1> /dev/null 2>&1; then
+    ob_success "Build ${LIB_LABEL} terminé. Plugins intégrés à dhewm3."
+else
+    ob_error "Aucun plugin (.so) n'a été généré par le SDK."
+fi

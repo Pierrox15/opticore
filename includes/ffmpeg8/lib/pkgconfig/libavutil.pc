@@ -1,0 +1,14 @@
+prefix=/opt/games/libs/ffmpeg8
+exec_prefix=${prefix}
+libdir=/opt/games/libs/ffmpeg8/lib
+includedir=/opt/games/libs/ffmpeg8/include
+
+Name: libavutil
+Description: FFmpeg utility library
+Version: 60.8.100
+Requires: 
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lavutil 
+Libs.private: -lva-drm -lva -lva-x11 -lva -lm -ldrm -lva -latomic -pthread -lX11
+Cflags: -I${includedir}

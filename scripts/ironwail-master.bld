@@ -1,0 +1,61 @@
+#!/bin/bash
+# core/scripts/ironwail.sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ENGINE="ironwail"
+ENGINE_LABEL="Ironwail"
+ENGINE_PORT="Quake"
+ENGINE_FEATURES="Support étendu du mapping moderne, latence ultra-faible compatibilité Vulkan"
+
+REPO_URL="https://github.com/andrei-drexler/ironwail.git"
+REPO_BRANCH_TAG="master"   # Accepte "master", "dev", ou un tag comme "v0.7.0"
+REPO_DEPTH=1
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ENGINE}"
+LOG_FILE="$OB_CORE_LOG/${ENGINE}_$(date +%F).log"
+ENGINE_DEST_DIR="$OB_ENGINES_DIR/${ENGINE}-${REPO_BRANCH_TAG:-master}"
+
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+ob_build_check "${ENGINE}" "${ENGINE_DEST_DIR}/${ENGINE}"
+
+# Agrégation des métadonnées
+ENGINE_DESC="
+## Engine: ${ENGINE_LABEL} (${ENGINE_PORT})
+* **Install Dir** : ${ENGINE_DEST_DIR}
+* **Git url** : ${REPO_URL}
+* **Git target** : ${REPO_BRANCH_TAG}
+* **Git Version** : ${OB_GIT_SHORT_SHA}
+* **Features** : ${ENGINE_FEATURES}
+* **Build date** : $(date +%F) by ${OB_USER}@${OB_HOST}
+* **Build on** : ${OB_CPU_DESC}
+* **Build infos** : ${OB_CLAGS_DESC}
+* **Build flags** : ${CFLAGS}
+"
+
+# Compilation
+cd "$LOCAL_SOURCE/Quake" || ob_error "Impossible d'accéder au dossier Quake."
+ob_info "Nettoyage des anciens fichiers de compilation (make clean)..."
+make clean
+ob_info "Lancement de Make..."
+make -j"$OB_MAKE_JOBS" 2>&1 | tee "$LOG_FILE"
+
+# Installation
+if [ -f "${ENGINE}" ]; then
+    ob_info "Installation dans ${ENGINE_DEST_DIR}..."
+    mkdir -p "${ENGINE_DEST_DIR}"
+    cp "${ENGINE}" "${ENGINE_DEST_DIR}/"
+
+    # Génération du fichier .info (le fameux relais sur le disque)
+    echo -e "$ENGINE_DESC" > "${ENGINE_DEST_DIR}/${ENGINE}.info"
+
+    # On n'exporte QUE les variables utiles pour l'environnement actuel
+    export ENGINE_DEST_DIR
+    export ENGINE_LABEL
+else
+    ob_error "Compilation échouée. Binaire introuvable."
+fi
+
+ob_success "Build ${ENGINE_LABEL} terminé."

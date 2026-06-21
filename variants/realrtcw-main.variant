@@ -1,0 +1,14 @@
+TARGET_ENGINE="realrtcw-main"
+GAME_DIR="realrtcw"
+GAME_EXE="realrtcw"
+GAME_LABEL="Real Return to Castle Wolfenstein"
+GAME_DESC="# Description:
+Sorti en 2001, Return to Castle Wolfenstein (RtCW) est un reboot magistral du pionnier du FPS, Wolfenstein 3D. Il mélange habilement combat militaire historique et horreur fantastique.
+"
+LAUNCH_PARAMS="+set fs_homepath $HOME/.optibox/iortcw +set cl_renderer rend2 +set r_mode -2 +set r_fullscreen 1"
+
+SOURCES=(
+    "rtcw/rtcw:main"
+    "realrtcw/5.4/assets:main"
+    "realrtcw/5.4/karsiah:karsiah"
+)

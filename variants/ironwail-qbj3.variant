@@ -1,0 +1,17 @@
+GAME_LABEL="Quake: Brutalism Jam 3"
+GAME_DIR="quake/ironwail-qbj3"
+TARGET_ENGINE="ironwail-master"
+LAUNCH_PARAMS="-game qbj3"
+
+GAME_DESC="
+# Brutalism Jam 3
+Quake Brutalist Jam III est un projet communautaire colossal, fruit de plus d'un an de travail. Il propose un arsenal entièrement nouveau, de nouveaux monstres, de nouveaux bonus et une refonte visuelle complète du catalogue de Quake. La communauté s'est mobilisée en masse, créant un nombre sans précédent de 77 cartes et repoussant les limites du moteur de Quake pour donner vie à l'esthétique oppressante, crasseuse et magnifique du brutalisme.
+*   **Nouveautés** : Nouvelles armes, nouveaux skin, ironwail.
+*   **Style** :  Architectural / Industriel.
+*   **Maps**:
+"
+
+SOURCES=(
+    "quake/id1:id1"
+    "quake/qbj3:qbj3"
+)

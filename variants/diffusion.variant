@@ -1,0 +1,20 @@
+#!/bin/bash
+# core/variants/half-life.variant
+
+# --- Informations Générales ---
+GAME_LABEL="Diffusion"
+GAME_DESC="mod xash3d."
+GAME_DIR="diffusion"
+
+# --- Moteur Cible ---
+# On utilise le moteur FWGS que nous venons de compiler
+TARGET_ENGINE="xash3d-master"
+
+# --- Sources d'Assets ---
+# Format : "dossier_source_dans_assets:nom_destination_dans_dist"
+SOURCES=(
+    "half-life/valve:valve"
+    "half-life/diffusion:diffusion"
+)
+
+LAUNCH_PARAMS="-console -game diffusion"

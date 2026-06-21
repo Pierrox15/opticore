@@ -1,0 +1,18 @@
+# core/variants/ironwail-ad.variant
+GAME_LABEL="Quake: Arcane Dimensions"
+GAME_DIR="quake/ironwail-ad"
+
+# Le nom exact du dossier généré dans OB_ENGINES_DIR (ex: ironwail-master)
+TARGET_ENGINE="ironwail-master"
+LAUNCH_PARAMS="-game ad"
+
+GAME_DESC="## Description
+Souvent considéré comme le successeur spirituel de Quake, ce mod repousse les limites du level-design avec des environnements d'une complexité architecturale inégalée.
+* **Nouveautés** : Bestiaire étendu, nouvelles armes et scripts de maps avancés.
+* **Style** : Dark Fantasy / Industriel."
+
+# Format : "DossierSource:DossierCible"
+SOURCES=(
+    "quake/id1:id1"
+    "quake/ad:ad"
+)

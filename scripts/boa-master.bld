@@ -1,0 +1,44 @@
+#!/bin/bash
+# core/scripts/boa-data.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ASSET_NAME="boa-data"
+ASSET_LABEL="Blade of Agony (Assets)"
+
+REPO_URL="https://github.com/Realm667/WolfenDoom.git"
+REPO_BRANCH_TAG="master"
+REPO_DEPTH=1
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ASSET_NAME}"
+LOG_FILE="$OB_CORE_LOG/${ASSET_NAME}_$(date +%F).log"
+
+# Le dossier cible est explicitement dans les assets
+ASSET_DEST_DIR="$OB_ASSETS_DIR/${ASSET_NAME}"
+TARGET_IPK3="${ASSET_DEST_DIR}/boa_v32.ipk3"
+
+# 1. Synchronisation Git
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+
+# 2. Vérification de la nécessité de packager
+# La fonction ob_build_check fonctionne parfaitement ici :
+# elle coupera le script si le commit local = distant et que l'archive .ipk3 existe déjà.
+ob_build_check "${ASSET_NAME}" "${TARGET_IPK3}"
+
+# 3. Packaging des assets
+ob_info "Génération de l'archive $(basename "$TARGET_IPK3") (Mode Store -0)..."
+mkdir -p "$ASSET_DEST_DIR"
+
+cd "$LOCAL_SOURCE" || ob_error "Impossible d'accéder aux sources de BoA."
+
+# Zippage sans compression (-0) pour accélérer le chargement en jeu
+# On exclut les dossiers liés à Git pour ne pas alourdir l'archive inutilement
+zip -0 -r -u "$TARGET_IPK3" ./* -x "./.git/*" -x "./.github/*" 2>&1 | tee "$LOG_FILE"
+
+if [ -f "$TARGET_IPK3" ]; then
+    ob_success "Packaging ${ASSET_LABEL} terminé et stocké dans les assets."
+else
+    ob_error "L'archive ${TARGET_IPK3} n'a pas pu être générée."
+fi

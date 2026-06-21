@@ -1,0 +1,127 @@
+#!/bin/bash
+# core/scripts/realrtcw-master.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ENGINE="realrtcw"
+ENGINE_LABEL="RealRTCW (Vulkan Edition)"
+ENGINE_PORT="Return to Castle Wolfenstein"
+ENGINE_FEATURES="Moteur iortcw, Rendu Vulkan injecté, Débridage Vertices (x8), LTO"
+
+# Dépôts sources
+REPO_URL="https://github.com/wolfetplayer/RealRTCW.git"
+REPO_BRANCH_TAG="main"
+
+VK_REPO_URL="https://github.com/iortcw/iortcw.git"
+VK_BRANCH_TAG="master"
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ENGINE}"
+VK_TEMP_SOURCE="$OB_CORE_SRC/iortcw-vk"
+LOG_FILE="$OB_CORE_LOG/${ENGINE}_$(date +%F).log"
+ENGINE_DEST_DIR="$OB_ENGINES_DIR/${ENGINE}-${REPO_BRANCH_TAG}"
+
+# Dépendances OptiCore
+FFMPEG_PATH="${OB_CORE_INCLUDES}/ffmpeg8"
+STEAM_SDK_DIR="${OB_CORE_INCLUDES}/steam"
+
+# 1. Synchronisation des deux sources
+ob_info "Synchronisation de RealRTCW..."
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "1"
+MAIN_SHA=$OB_GIT_SHORT_SHA
+
+ob_info "Récupération du renderer Vulkan depuis iortcw..."
+ob_git_sync "$VK_REPO_URL" "$VK_TEMP_SOURCE" "$VK_BRANCH_TAG" "1"
+
+# 2. Injection du Renderer (rend2 / Vulkan)
+ob_info "Injection du code rend2 dans l'arborescence RealRTCW..."
+if [ -d "$VK_TEMP_SOURCE/SP/code/rend2" ]; then
+    rm -rf "$LOCAL_SOURCE/code/rend2"
+    cp -r "$VK_TEMP_SOURCE/SP/code/rend2" "$LOCAL_SOURCE/code/"
+else
+    ob_error "Impossible de trouver le dossier SP/code/rend2 dans iortcw."
+fi
+
+# 3. Vérification build_check
+ob_build_check "${ENGINE}" "${ENGINE_DEST_DIR}/${ENGINE}"
+
+# 4. Patchs et Dépendances (ON VERROUILLE LE DOSSIER ICI)
+ob_info "Application des patchs (Géométrie, FFmpeg, Steam)..."
+cd "$LOCAL_SOURCE" || exit 1
+
+# Patch géométrie (x8)
+find code/ -name "tr_local.h" -type f -exec sed -i 's/#define SHADER_MAX_VERTEXES.*/#define SHADER_MAX_VERTEXES 8192/g' {} +
+find code/ -name "tr_local.h" -type f -exec sed -i 's/#define SHADER_MAX_INDEXES.*/#define SHADER_MAX_INDEXES 24000/g' {} +
+
+# Patch FFmpeg 8.0
+sed -i 's/\bSwsContext\b/struct SwsContext/g' "code/client/cl_cin.c"
+
+# Patch Steam (La solution propre et définitive)
+# -> On corrige le code pour qu'il cherche dans code/steam/
+find code/ -type f -name "*.c" -exec sed -i 's|../../steam/steam.h|../steam/steam.h|g' {} +
+# -> On injecte le SDK Valve dans ce même dossier
+if [ -d "$STEAM_SDK_DIR" ]; then
+    ln -sf "$STEAM_SDK_DIR/"*.h "code/steam/"
+fi
+
+# 5. Génération du Makefile.local
+ob_info "Configuration du Makefile.local optimisé..."
+cat << EOF > Makefile.local
+# --- Chemins d'installation ---
+COPYDIR = ${ENGINE_DEST_DIR}
+COPYBINDIR = ${ENGINE_DEST_DIR}
+NO_STRIP = 0
+
+# --- Paramètres de base (ton ancien Makefile.local) ---
+STEAM = 0
+BUILD_STEAMSHIM = 0
+USE_CURL = 0
+
+# --- Architecture OptiBox (LTO & Natif) ---
+# On désactive le DLOPEN pour fusionner le moteur de rendu principal
+USE_RENDERER_DLOPEN = 0
+BUILD_GAME_SO = 1
+BUILD_GAME_QVM = 0
+
+# --- Activation du rendu injecté (Vulkan) ---
+BUILD_RENDERER_REND2 = 1
+USE_REND2 = 1
+USE_VULKAN = 1
+BUILD_RENDERER_VULKAN = 1
+
+# --- Optimisations Yorkfield / Core2 ---
+OPTIMIZE = ${CFLAGS}
+
+# --- Intégration FFmpeg (Correction du Linker Order) ---
+FFMPEG_CFLAGS = -I${FFMPEG_PATH}/include
+CFLAGS += \$(FFMPEG_CFLAGS)
+
+# LDFLAGS doit contenir UNIQUEMENT les chemins
+LDFLAGS = -L${FFMPEG_PATH}/lib -Wl,-rpath,${FFMPEG_PATH}/lib ${LDFLAGS} -s
+
+# CLIENT_LIBS contient les librairies (appelées APRÈS les objets)
+CLIENT_LIBS = -lavformat -lavcodec -lavutil -lswscale -lswresample -lm -lpthread -lz -ldl -lSDL2
+EOF
+
+# 6. Compilation
+ob_info "Lancement de la forge..."
+make clean
+make -j"$OB_MAKE_JOBS" V=1 2>&1 | tee "$LOG_FILE"
+
+if [ -f build/release-linux-x86_64-nosteam/RealRTCW.x86_64 ]; then
+    ob_info "Installation des binaires et modules..."
+    mkdir -p "${ENGINE_DEST_DIR}"
+
+    # On force la copie depuis le dossier nosteam
+    cp -r build/release-linux-x86_64-nosteam/* "${ENGINE_DEST_DIR}/"
+
+    # Standardisation du nom du binaire pour ton launcher
+    mv "${ENGINE_DEST_DIR}/RealRTCW.x86_64" "${ENGINE_DEST_DIR}/${ENGINE}"
+
+    echo -e "## Engine: ${ENGINE_LABEL}\n* **Source** : Mixed (RealRTCW + iortcw VK)\n* **Build** : $(date)\n* **Flags** : ${CFLAGS}" > "${ENGINE_DEST_DIR}/${ENGINE}.info"
+
+    ob_success "Build terminé avec succès ! Binaire disponible dans ${ENGINE_DEST_DIR}"
+else
+    ob_error "Binaire non trouvé dans build/release-linux-x86_64-nosteam/. Vérifiez la compilation."
+fi

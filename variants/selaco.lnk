@@ -1,0 +1,4 @@
+# Pour Selaco, on lie les fichiers de données vers le dossier gzdoom
+GAME_DIR="selaco"
+ASSET_DIR="selaco"
+PK_EXT="ipk3"

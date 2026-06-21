@@ -1,0 +1,53 @@
+#!/bin/bash
+# core/scripts/xash3d-master.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ENGINE="xash3d"
+ENGINE_LABEL="Xash3D FWGS"
+ENGINE_PORT="Half-Life"
+ENGINE_FEATURES="Moteur open-source Half-Life, SDL2 natif, optimisé pour faible latence (ALSA/DMIX)"
+
+REPO_URL="https://github.com/FWGS/xash3d-fwgs.git"
+REPO_BRANCH_TAG="master"   # Accepte "master", ou un tag spécifique
+REPO_DEPTH=1
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ENGINE}"
+LOG_FILE="$OB_CORE_LOG/${ENGINE}_$(date +%F).log"
+ENGINE_DEST_DIR="$OB_ENGINES_DIR/${ENGINE}-${REPO_BRANCH_TAG:-master}"
+
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+ob_build_check "${ENGINE}" "${ENGINE_DEST_DIR}/xash3d"
+
+# Agrégation des métadonnées (Correction de la typo OB_CFLAGS_DESC incluse)
+ENGINE_DESC="
+## Engine: ${ENGINE_LABEL} (${ENGINE_PORT})
+* **Install Dir** : ${ENGINE_DEST_DIR}
+* **Git url** : ${REPO_URL}
+* **Git target** : ${REPO_BRANCH_TAG}
+* **Git Version** : ${OB_GIT_SHORT_SHA}
+* **Features** : ${ENGINE_FEATURES}
+* **Build date** : $(date +%F) by ${OB_USER}@${OB_HOST}
+* **Build on** : ${OB_CPU_DESC}
+* **Build infos** : ${OB_CFLAGS_DESC}
+* **Build flags** : ${CFLAGS}
+"
+
+# Compilation
+cd "$LOCAL_SOURCE" || ob_error "Impossible d'accéder au dossier source."
+
+ob_info "Mise à jour des sous-modules Git (Requis pour Xash3D)..."
+git submodule update --init --recursive 2>&1 | tee "$LOG_FILE"
+
+ob_info "Configuration de l'environnement Waf..."
+# On retire le --prefix ici, Waf le gérera à l'installation
+./waf configure -T release -8 2>&1 | tee -a "$LOG_FILE"
+
+ob_info "Lancement de la compilation (Make via Waf)..."
+./waf build 2>&1 | tee -a "$LOG_FILE"
+
+ob_info "Installation dans ${ENGINE_DEST_DIR}..."
+./waf install --destdir="${ENGINE_DEST_DIR}" 2>&1 | tee -a "$LOG_FILE"
+

@@ -1,0 +1,20 @@
+#!/bin/bash
+# core/variants/hl-blueshift.variant
+
+# --- Informations Générales ---
+GAME_LABEL="Half-Life Blue Shift (2001)"
+GAME_DESC="Incarnez Barney Calhoun, un garde de sécurité de Black Mesa dans cette deuxième extension officiel de Half Life"
+GAME_DIR="hl-blueshift"
+
+# --- Moteur Cible ---
+# On utilise le moteur FWGS que nous venons de compiler
+TARGET_ENGINE="xash3d-master"
+
+# --- Sources d'Assets ---
+# Format : "dossier_source_dans_assets:nom_destination_dans_dist"
+SOURCES=(
+    "half-life/valve:valve"
+    "half-life/bshift:bshift"
+)
+
+LAUNCH_PARAMS="-console -game bshift"

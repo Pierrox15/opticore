@@ -1,0 +1,14 @@
+prefix=/opt/games/libs/ffmpeg8
+exec_prefix=${prefix}
+libdir=/opt/games/libs/ffmpeg8/lib
+includedir=/opt/games/libs/ffmpeg8/include
+
+Name: libavformat
+Description: FFmpeg container format library
+Version: 62.3.100
+Requires: 
+Requires.private: libavcodec >= 62.11.100, libswresample >= 6.1.100, libavutil >= 60.8.100
+Conflicts:
+Libs: -L${libdir}  -lavformat 
+Libs.private: -lm -latomic -lbz2 -lz
+Cflags: -I${includedir}

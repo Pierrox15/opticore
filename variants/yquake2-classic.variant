@@ -1,0 +1,15 @@
+GAME_LABEL="Quake II (Classic)"
+GAME_DIR="yquake2-classic"
+GAME_EXE="yquake2"
+TARGET_ENGINE="yquake2-master"
+GAME_DESC="
+## L'expérience originale (1997)
+Incarnez Bitterman, un Marine spatial participant à l'opération *Alien Overlord* pour contrecarrer l'invasion de la Terre par les Stroggs.
+
+Cette variante propose la campagne classique brute, propulsée par le moteur Yamagi Quake 2. Elle tire parti de l'architecture OptiBox avec un rendu Vulkan natif pour garantir des *frametimes* absolument parfaits et une latence réseau nulle, tout en préservant scrupuleusement le gameplay, l'intelligence artificielle et la physique d'origine.
+"
+SOURCES=(
+    "quake2/original/baseq2:baseq2"
+)
+
+LAUNCH_PARAMS=""

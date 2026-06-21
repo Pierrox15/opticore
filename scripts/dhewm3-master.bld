@@ -1,0 +1,90 @@
+#!/bin/bash
+# core/scripts/dhewm3-master.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ENGINE="dhewm3"
+ENGINE_LABEL="dhewm3"
+ENGINE_PORT="Doom 3 (id Tech 4)"
+ENGINE_FEATURES="Port natif 64-bit pour Doom 3, support SDL2, OpenAL, EAX HD et Widescreen"
+
+# Dépôt officiel de dhewm3
+REPO_URL="https://github.com/dhewm/dhewm3.git"
+REPO_BRANCH_TAG="master"
+REPO_DEPTH=1
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ENGINE}"
+LOG_FILE="$OB_CORE_LOG/${ENGINE}_$(date +%F).log"
+ENGINE_DEST_DIR="$OB_ENGINES_DIR/${ENGINE}-${REPO_BRANCH_TAG:-master}"
+
+# 1. Synchronisation Git
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+
+# 2. Vérification de la nécessité de compiler
+ob_build_check "${ENGINE}" "${ENGINE_DEST_DIR}/${ENGINE}"
+
+# 3. Agrégation des métadonnées
+ENGINE_DESC="
+## Engine: ${ENGINE_LABEL} (${ENGINE_PORT})
+* **Install Dir** : ${ENGINE_DEST_DIR}
+* **Git url** : ${REPO_URL}
+* **Git target** : ${REPO_BRANCH_TAG}
+* **Git Version** : ${OB_GIT_SHORT_SHA}
+* **Features** : ${ENGINE_FEATURES}
+* **Build date** : $(date +%F) by ${OB_USER}@${OB_HOST}
+* **Build on** : ${OB_CPU_DESC}
+* **Build infos** : ${OB_CFLAGS_DESC}
+* **Build flags** : ${CFLAGS}
+"
+
+# 4. Compilation (dhewm3 utilise CMake dans le dossier 'neo')
+cd "$LOCAL_SOURCE/neo" || ob_error "Impossible d'accéder au dossier source 'neo' de dhewm3."
+
+ob_info "Configuration de l'environnement de build (CMake)..."
+rm -rf build
+mkdir build
+cd build || ob_error "Impossible de créer le dossier build."
+
+# Injection des variables d'optimisation
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_FLAGS="$CFLAGS" \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+    2>&1 | tee "$LOG_FILE"
+
+ob_info "Lancement de Make..."
+make -j"$OB_MAKE_JOBS" 2>&1 | tee -a "$LOG_FILE"
+
+# 5. Installation
+if [ -f "${ENGINE}" ]; then
+    ob_info "Installation dans ${ENGINE_DEST_DIR}..."
+    mkdir -p "${ENGINE_DEST_DIR}"
+
+    # Copie du binaire principal
+    cp "${ENGINE}" "${ENGINE_DEST_DIR}/"
+
+    # Copie des bibliothèques de jeu (.so) vitales pour le fonctionnement (base.so, d3xp.so)
+    ob_info "Copie des bibliothèques dynamiques (base.so, d3xp.so)..."
+    cp *.so "${ENGINE_DEST_DIR}/" 2>/dev/null || true
+
+    # Génération du fichier relais .info sur le disque
+    echo -e "$ENGINE_DESC" > "${ENGINE_DEST_DIR}/${ENGINE}.info"
+
+    export ENGINE_DEST_DIR
+    export ENGINE_LABEL
+else
+    ob_error "Compilation échouée. Binaire '${ENGINE}' introuvable dans le dossier build."
+fi
+
+SDK_SCRIPT="${OB_CORE_SCRIPTS}/dhewm3-sdk.bld"
+if [ -f "$SDK_SCRIPT" ]; then
+    ob_info "Déclenchement de la compilation des plugins (SDK)..."
+    chmod +x "$SDK_SCRIPT"
+    "$SDK_SCRIPT"
+fi
+# ----------------------------------------
+
+ob_success "Déploiement complet de ${ENGINE_LABEL} (Moteur + Plugins) terminé."

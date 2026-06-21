@@ -1,0 +1,16 @@
+# core/variants/doom3-classic.variant
+GAME_LABEL="Doom 3 redux"
+GAME_DIR="doom3/redux"
+TARGET_ENGINE="dhewm3-master"
+LAUNCH_PARAMS=""
+
+GAME_DESC="## Description
+Doom3 recréée sur le moteur id Tech 4.
+* **Nouveautés** : Campagne originale complète avec les graphismes et l'éclairage dynamique de Doom 3.
+* **Style** : Rétro FPS / Action."
+
+# Format : "DossierSource:DossierCible"
+SOURCES=(
+    "doom3/doom3:base"
+    "doom3/redux:base"
+)

@@ -1,0 +1,90 @@
+#!/bin/bash
+# core/scripts/uzdoom-master.bld
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "${SCRIPT_DIR}/../globals.conf"
+source "${OB_CORE_HELPERS}/common.sh"
+
+ENGINE="uzdoom"
+ENGINE_LABEL="UZDoom"
+ENGINE_PORT="ZDoom / GZDoom"
+ENGINE_FEATURES="Fork de GZDoom, rendu avancé Vulkan/OpenGL, ZScript, optimisations natives"
+
+# Dépôt officiel de UZDoom
+REPO_URL="https://github.com/UZDoom/UZDoom.git"
+REPO_BRANCH_TAG="trunk"
+REPO_DEPTH=1
+
+LOCAL_SOURCE="$OB_CORE_SRC/${ENGINE}"
+LOG_FILE="$OB_CORE_LOG/${ENGINE}_$(date +%F).log"
+ENGINE_DEST_DIR="$OB_ENGINES_DIR/${ENGINE}-${REPO_BRANCH_TAG:-master}"
+
+# GIT SYNC
+ob_git_sync "$REPO_URL" "$LOCAL_SOURCE" "$REPO_BRANCH_TAG" "$REPO_DEPTH"
+
+# GIT COMPARE
+ob_build_check "${ENGINE}" "${ENGINE_DEST_DIR}/${ENGINE}"
+
+# METADONNEES
+ENGINE_DESC="
+## Engine: ${ENGINE_LABEL} (${ENGINE_PORT})
+* **Install Dir** : ${ENGINE_DEST_DIR}
+* **Git url** : ${REPO_URL}
+* **Git target** : ${REPO_BRANCH_TAG}
+* **Git Version** : ${OB_GIT_SHORT_SHA}
+* **Features** : ${ENGINE_FEATURES}
+* **Build date** : $(date +%F) by ${OB_USER}@${OB_HOST}
+* **Build on** : ${OB_CPU_DESC}
+* **Build infos** : ${OB_CFLAGS_DESC}
+* **Build flags** : ${CFLAGS}
+"
+
+# COMPILATION (Uzdoom utilise cmake)
+cd "$LOCAL_SOURCE" || ob_error "Impossible d'accéder au dossier source de UZDoom."
+
+ob_info "Configuration de l'environnement de build (CMake)..."
+
+# Nettoyage du cache
+rm -rf build
+mkdir build
+cd build || ob_error "Impossible de créer le dossier build."
+
+# VARIABLES DE COMPILATION
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_FLAGS="$CFLAGS" \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+    -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+    2>&1 | tee "$LOG_FILE"
+
+ob_info "Lancement de Make..."
+make -j"$OB_MAKE_JOBS" 2>&1 | tee -a "$LOG_FILE"
+
+# INSTALLATION
+# Contrairement à Quake, la famille ZDoom génère le binaire ET des archives .pk3 nécessaires au lancement.
+if [ -f "${ENGINE}" ]; then
+    ob_info "Installation dans ${ENGINE_DEST_DIR}..."
+    mkdir -p "${ENGINE_DEST_DIR}"
+
+    # Copie du binaire principal
+    cp "${ENGINE}" "${ENGINE_DEST_DIR}/"
+
+    # Copie des archives vitales (uzdoom.pk3, lights.pk3, brightmaps.pk3, etc.)
+    ob_info "Copie des ressources internes (.pk3)..."
+    cp *.pk3 "${ENGINE_DEST_DIR}/" 2>/dev/null || true
+
+    # Copie des banques de sons MIDI si elles ont été générées
+    [ -d "soundfonts" ] && cp -r "soundfonts" "${ENGINE_DEST_DIR}/"
+    [ -d "fm_banks" ] && cp -r "fm_banks" "${ENGINE_DEST_DIR}/"
+
+    # Génération du fichier relais .info sur le disque
+    echo -e "$ENGINE_DESC" > "${ENGINE_DEST_DIR}/${ENGINE}.info"
+
+    # Export des variables pour de potentiels hooks système
+    export ENGINE_DEST_DIR
+    export ENGINE_LABEL
+else
+    ob_error "Compilation échouée. Binaire '${ENGINE}' introuvable dans le dossier build."
+fi
+
+ob_success "Build ${ENGINE_LABEL} terminé"
